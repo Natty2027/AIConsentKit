@@ -82,7 +82,7 @@ let gate = ConsentGate(
     upstream: ProxyProvider(configuration: .init(
         baseURL: URL(string: "https://api.example.com")!
     )),
-    isConsentGranted: { consentFlag.value },  // see note below
+    isConsentGranted: { controller.isGranted },  // thread-safe; see note below
     redaction: .standard,
     budget: BudgetGuard()
 )
@@ -98,11 +98,11 @@ AIGatedView(controller: controller) {
 ### Reading consent from the gate
 
 `ConsentGate` is an `actor`, so its `isConsentGranted` closure runs off the main
-actor. Do **not** reach into a `@MainActor` controller from inside it — e.g.
-`MainActor.assumeIsolated { controller.state == .granted }` will trap at runtime.
-Read from a thread-safe snapshot instead and keep it in sync with the
-controller. `Examples/AIConsentDemo` shows the pattern with a small lock-guarded
-`ConsentFlag` updated via `.onChange(of: controller.state)`.
+actor. Do **not** reach into the `@MainActor` `controller.state` from inside it —
+e.g. `MainActor.assumeIsolated { controller.state == .granted }` will trap at
+runtime. Use `controller.isGranted`, a `nonisolated`, thread-safe snapshot the
+controller keeps in sync with `state`. That is exactly what the quick start and
+`Examples/AIConsentDemo` do.
 
 ## Running the demo
 

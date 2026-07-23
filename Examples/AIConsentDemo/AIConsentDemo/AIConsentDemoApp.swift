@@ -62,11 +62,7 @@ struct RootView: View {
 
     var body: some View {
         AIGatedView(controller: controller) {
-            AssistantScreen(
-                controller: controller,
-                autoSend: RootView.demoAssistant,
-                initiallyGranted: RootView.demoAssistant
-            )
+            AssistantScreen(controller: controller, autoSend: RootView.demoAssistant)
         } declined: {
             DeclinedScreen(controller: controller)
         }
@@ -78,27 +74,21 @@ struct RootView: View {
 struct AssistantScreen: View {
     private let controller: AIConsentController
     private let autoSend: Bool
-    // Thread-safe mirror of consent state. `ConsentGate` is an actor, so its
-    // `isConsentGranted` closure runs off the main actor — reaching back into
-    // the @MainActor controller from there (e.g. via MainActor.assumeIsolated)
-    // traps. The flag is safe to read from any executor and is kept in sync
-    // with the controller below.
-    private let consentFlag: ConsentFlag
     @State private var viewModel: AssistantViewModel
     @State private var input = ""
     @State private var showingSettings = false
 
-    init(controller: AIConsentController, autoSend: Bool = false, initiallyGranted: Bool = false) {
+    init(controller: AIConsentController, autoSend: Bool = false) {
         self.controller = controller
         self.autoSend = autoSend
-        let flag = ConsentFlag(initiallyGranted)
-        self.consentFlag = flag
 
-        // Every call site holds a gate, never a bare provider. The gate
-        // refuses to forward anything unless consent is currently valid.
+        // Every call site holds a gate, never a bare provider. The gate refuses
+        // to forward anything unless consent is currently valid. `isGranted` is
+        // the controller's thread-safe snapshot — the gate is an actor, so this
+        // closure runs off the main actor.
         let gate = ConsentGate(
             upstream: MockProvider(behavior: .stream(Self.demoReply, chunkDelay: .milliseconds(90))),
-            isConsentGranted: { flag.value },
+            isConsentGranted: { controller.isGranted },
             redaction: .standard,
             budget: BudgetGuard()
         )
@@ -140,9 +130,6 @@ struct AssistantScreen: View {
                 if autoSend && viewModel.messages.isEmpty && !viewModel.isStreaming {
                     viewModel.send("Give me the one-line pitch for AIConsentKit.")
                 }
-            }
-            .onChange(of: controller.state) { _, newState in
-                consentFlag.set(newState == .granted)
             }
         }
     }
@@ -222,27 +209,6 @@ struct AssistantScreen: View {
         "what you disclosed, ", "so widening the disclosure ", "re-asks the user ",
         "instead of silently ", "reusing old consent."
     ]
-}
-
-/// A lock-guarded boolean the `ConsentGate` closure can read from any executor.
-/// Mirrors the @MainActor controller's granted state without touching it.
-private final class ConsentFlag: @unchecked Sendable {
-    private let lock = NSLock()
-    private var granted: Bool
-
-    init(_ granted: Bool) {
-        self.granted = granted
-    }
-
-    var value: Bool {
-        lock.lock(); defer { lock.unlock() }
-        return granted
-    }
-
-    func set(_ newValue: Bool) {
-        lock.lock(); defer { lock.unlock() }
-        granted = newValue
-    }
 }
 
 private struct Bubble: View {

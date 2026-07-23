@@ -46,6 +46,45 @@ final class ConsentGateTests: XCTestCase {
         XCTAssertEqual(response.text, "hi there")
     }
 
+    // Regression: the gate is an actor, so `isConsentGranted` runs off the main
+    // actor. Reading the controller's @MainActor state from there used to trap.
+    // `controller.isGranted` is a thread-safe snapshot that is safe to read here.
+    @MainActor
+    func testReadsControllerSnapshotFromGateActorContext() async throws {
+        let disclosure = AIDataDisclosure(
+            version: 1,
+            categories: [.promptText],
+            recipients: [AIRecipient(
+                id: "vendor",
+                legalName: "Vendor Inc",
+                productName: "Vendor",
+                privacyPolicyURL: URL(string: "https://example.com")!,
+                usedForModelTraining: false,
+                retentionSummary: "none"
+            )],
+            firstPartyPrivacyPolicyURL: URL(string: "https://example.com/privacy")!,
+            declineConsequence: "ok"
+        )
+        let controller = AIConsentController(disclosure: disclosure, store: InMemoryConsentStore())
+        controller.grant()
+
+        let gate = ConsentGate(
+            upstream: MockProvider(behavior: .succeed("ok")),
+            isConsentGranted: { controller.isGranted }
+        )
+
+        let response = try await gate.send(request)
+        XCTAssertEqual(response.text, "ok")
+
+        controller.withdraw()
+        do {
+            _ = try await gate.send(request)
+            XCTFail("Withdrawn consent must block")
+        } catch let error as AIError {
+            XCTAssertEqual(error, .consentNotGranted)
+        }
+    }
+
     func testAppliesRedactionBeforeForwarding() async throws {
         let capture = CapturingProvider()
         let gate = ConsentGate(
