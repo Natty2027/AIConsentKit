@@ -2,8 +2,12 @@
 .build/
 .swiftpm/
 DerivedData/
+build/
 *.xcuserstate
 xcuserdata/
 *.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
 Secrets.plist
 .env
+
+# Demo app project is generated from project.yml via XcodeGen.
+Examples/AIConsentDemo/AIConsentDemo.xcodeproj/

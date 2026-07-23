@@ -12,6 +12,14 @@ consent requirements structurally hard to get wrong, and bundles the streaming,
 error-handling, redaction, and cost-metering pieces that AI features need
 anyway.
 
+| Consent gate (shown before any data leaves the device) | Assistant, running on the `MockProvider` |
+| :---: | :---: |
+| <img src="Docs/Screenshots/consent.png" width="300" alt="Consent sheet listing what is sent and who receives it, with Don't allow / Allow"> | <img src="Docs/Screenshots/assistant.png" width="300" alt="Assistant chat with a streamed reply and a running cost meter"> |
+
+A runnable demo app lives in [`Examples/AIConsentDemo`](Examples/AIConsentDemo).
+It wires the real kit to a `MockProvider`, so it runs on a simulator with no API
+key and no backend. See [Running the demo](#running-the-demo).
+
 ## Why this exists
 
 On 13 November 2025 Apple revised guideline 5.1.2(i) to add:
@@ -74,7 +82,7 @@ let gate = ConsentGate(
     upstream: ProxyProvider(configuration: .init(
         baseURL: URL(string: "https://api.example.com")!
     )),
-    isConsentGranted: { MainActor.assumeIsolated { controller.state == .granted } },
+    isConsentGranted: { consentFlag.value },  // see note below
     redaction: .standard,
     budget: BudgetGuard()
 )
@@ -86,6 +94,33 @@ AIGatedView(controller: controller) {
     ContentUnavailableView("AI features are off", systemImage: "sparkles.slash")
 }
 ```
+
+### Reading consent from the gate
+
+`ConsentGate` is an `actor`, so its `isConsentGranted` closure runs off the main
+actor. Do **not** reach into a `@MainActor` controller from inside it — e.g.
+`MainActor.assumeIsolated { controller.state == .granted }` will trap at runtime.
+Read from a thread-safe snapshot instead and keep it in sync with the
+controller. `Examples/AIConsentDemo` shows the pattern with a small lock-guarded
+`ConsentFlag` updated via `.onChange(of: controller.state)`.
+
+## Running the demo
+
+The demo has no committed `.xcodeproj`; it is generated from `project.yml` with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) so the repo stays clean.
+
+```sh
+brew install xcodegen
+cd Examples/AIConsentDemo
+xcodegen generate
+open AIConsentDemo.xcodeproj   # then Run, or:
+xcodebuild -scheme AIConsentDemo \
+  -destination 'platform=iOS Simulator,name=iPhone 17' build
+```
+
+It launches straight into the consent gate. Allow, and the assistant streams a
+scripted reply from the `MockProvider` — no API key, no network. The gear opens a
+Settings sheet where consent can be withdrawn.
 
 ## API keys
 
