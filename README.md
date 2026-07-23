@@ -2,9 +2,9 @@
 
 Ship an AI feature that passes App Review.
 
+[![CI](https://github.com/Natty2027/AIConsentKit/actions/workflows/ci.yml/badge.svg)](https://github.com/Natty2027/AIConsentKit/actions/workflows/ci.yml)
 ![Swift 6.3](https://img.shields.io/badge/Swift-6.3-orange)
 ![Platforms iOS 17+ / macOS 14+](https://img.shields.io/badge/Platforms-iOS%2017%2B%20%7C%20macOS%2014%2B-blue)
-![Tests 31 passing](https://img.shields.io/badge/Tests-31%20passing-brightgreen)
 ![License MIT](https://img.shields.io/badge/License-MIT-lightgrey)
 
 Swift package for iOS 17+ that makes Apple's guideline 5.1.2(i) disclosure and
