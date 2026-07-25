@@ -15,7 +15,10 @@ public protocol AIConsentStoring: Sendable {
 /// making. If you have a reason to persist across reinstall, write your own
 /// conforming type; do not change this one.
 public struct UserDefaultsConsentStore: AIConsentStoring {
-    private let defaults: UserDefaults
+    // `UserDefaults` is thread-safe but not marked `Sendable` in the SDK, which
+    // makes this `Sendable` struct an error under the Swift 6 language mode.
+    // Access here is thread-safe, so opt this one property out explicitly.
+    nonisolated(unsafe) private let defaults: UserDefaults
     private let key: String
 
     public init(defaults: UserDefaults = .standard, key: String = "AIConsentKit.consentRecord") {
